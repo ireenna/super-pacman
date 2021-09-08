@@ -162,7 +162,7 @@ class App:
             pygame.draw.circle(self.screen, orange,
                                (int(coin.x*self.cell_width)+self.cell_width//2+BORDER_FIELD//2,
                                 int(coin.y*self.cell_height)+self.cell_height//2+BORDER_FIELD//2), 3)
-        if len(self.coins) == 0:
+        if len(self.coins) == 280:
             self.state = "win"
 
 # GAME WIN
