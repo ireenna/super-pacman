@@ -154,6 +154,10 @@ class App:
         self.player.draw()
         for enemy in self.enemies:
             enemy.draw()
+            # enemy.path = enemy.get_BFS(vec(enemy.field_xy), self.player.field_xy)
+            # enemy.path = enemy.get_DFS(vec(enemy.field_xy), self.player.field_xy)
+            # enemy.path = enemy.get_UCS(vec(enemy.field_xy), vec(self.player.field_xy))
+            enemy.draw_path()
         pygame.display.update()
 
 
@@ -162,7 +166,7 @@ class App:
             pygame.draw.circle(self.screen, orange,
                                (int(coin.x*self.cell_width)+self.cell_width//2+BORDER_FIELD//2,
                                 int(coin.y*self.cell_height)+self.cell_height//2+BORDER_FIELD//2), 3)
-        if len(self.coins) == 280:
+        if len(self.coins) == 0:
             self.state = "win"
 
 # GAME WIN
@@ -213,5 +217,3 @@ class App:
         self.draw_text('PRESS ESC TO QUIT', self.screen, [
             WIDTH // 2, HEIGHT // 2 + 200], START_TEXT_SIZE, white, START_FONT, centered=True)
         pygame.display.update()
-
-
