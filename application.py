@@ -156,7 +156,7 @@ class App:
             enemy.draw()
             # enemy.path = enemy.get_BFS(vec(enemy.field_xy), self.player.field_xy)
             # enemy.path = enemy.get_DFS(vec(enemy.field_xy), self.player.field_xy)
-            # enemy.path = enemy.get_UCS(vec(enemy.field_xy), vec(self.player.field_xy))
+            enemy.path = enemy.get_UCS(vec(enemy.field_xy), vec(self.player.field_xy))
             enemy.draw_path()
         pygame.display.update()
 

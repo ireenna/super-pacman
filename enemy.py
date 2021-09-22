@@ -61,36 +61,38 @@ class Enemy:
                    self.app.cell_height//2)
 
 
-    def get_BFS(self, start, target):
+    def get_BFS(self, start, target): # пошаровий пошук (в ширину)
         grid = self.load_grid()
 
         if not self.is_valid_target(target):
             print("Wrong target")
             return [start]
-        queue = [start]
+
+        queue = [start] # реалізовуємо через чергу
         path = []
         visited = []
-        directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+        directions = [[0, -1], [1, 0], [0, 1], [-1, 0]] # вказуємо можливі напрямки
 
-        while queue:
-            current = queue[0]
+        while queue: # поки в нас є черга (не пуста)
+            current = queue[0] # заходимо у перший елемент, позначаємо як теперішній і прибираємо з черги
             queue.remove(queue[0])
-            visited.append(current)
+            visited.append(current) # помічаємо як відвіданий
             if current == target:
                 break
             else:
-                for direction in directions:
-                    step = current + direction
-                    if grid[int(step[1]), int(step[0])] != 1:
-                        if step not in visited:
-                            queue.append(step)
-                            path.append({"Current": current, "Next": step})
-        shortest = [target]
-        while target != start:
-            for step in path:
-                if step["Next"] == target:
-                    target = step["Current"]
-                    shortest.insert(0, step["Current"])
+                for direction in directions: # для усіх напрямків
+                    step = current + direction # робимо крок у обраному напрямку
+                    if grid[int(step[1]), int(step[0])] != 1: # перевіряємо чи це наша ціль
+                        if step not in visited: # якщо не ціль і не відвідано
+                            queue.append(step) # то додаємо крок до черги
+                            path.append({"Current": current, "Next": step}) # додаємо у шлях
+        # шукаємо найкоротший шлях
+        shortest = [target] # присвоюємо цільові значення змінній
+        while target != start: # поки ціль не дорівнює початку
+            for step in path: # для кожного кроку в отриманому нами раніше шляху
+                if step["Next"] == target: # якщо наступний крок -ціль
+                    target = step["Current"] # ставимо ціль нинішнім кроком
+                    shortest.insert(0, step["Current"]) # зберігаємо цю коротку дорогу у списку
 
         return shortest
 
@@ -154,6 +156,7 @@ class Enemy:
                     step_cost = edge[-1]
                     q.put((step_cost + cost, next_node))
             path.append(q.queue[0][1][::-1])
+
 
 
 
