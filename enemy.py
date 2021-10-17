@@ -28,23 +28,15 @@ class Enemy:
         return True
 
     def update(self):
-        # if self.can_move():
-        #     self.pix_pos += self.direction
-        # elif self.direction == vec(-1, 0):
-        #     self.direction = vec(1,0)
-        # elif self.direction == vec(1,0):
-        #     self.direction = vec(-1,0)
-
         if self.path is not None:
             pass
-            # print(self.field_xy, self.path[1], self.get_xy())
-            # self.field_xy = self.path[1]
-            # self.pix_pos = self.get_xy()
 
         self.field_xy[0] = (self.pix_pos[0]-BORDER_FIELD +
                             self.app.cell_width//2)//self.app.cell_width+1
         self.field_xy[1] = (self.pix_pos[1]-BORDER_FIELD +
                             self.app.cell_height//2)//self.app.cell_height+1
+
+        print(self.field_xy)
 
     def draw(self):
         self.pacman = pygame.transform.scale(pygame.image.load('images/ghost.png'), (self.app.cell_width,
@@ -199,3 +191,10 @@ class Enemy:
             return False
         else:
             return True
+
+class RandomEnemy(Enemy):
+    def __init__(self, app, pos, number):
+        super().__init__(app,pos,number)
+    # random path
+    def go(self):
+        directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]

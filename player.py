@@ -1,4 +1,13 @@
+import heapq
+import queue
+import random
+import time
+from datetime import datetime
+
 import pygame
+
+import search_algorythm
+from search_algorythm import AlgStar, euclid_h
 from settings import *
 
 
@@ -10,12 +19,25 @@ class Player:
         self.starting_pos = [pos.x, pos.y]
         self.field_xy = pos
         self.pix_pos = self.get_xy()
-        self.direction = vec(1, 0)
+        self.direction = vec(0, 0)
         self.stored_direction = None
         self.able_to_move = True
         self.current_score = 0
         self.speed = 2
+        # self.path = []
+        self.maze = search_algorythm.maze_to_grid(self.app.map)
+        self.path = self.collect_coins()
 
+        # self.path = AlgStar(self.maze, (int(self.field_xy[1])-1, int(self.field_xy[0])-1),
+        #                     (int(self.app.target[0]-1),int(self.app.target[1]-1)),
+        #                     search_algorythm.take_all_coins_heuristic, self.app.coins)
+
+    def draw_path(self):
+        for step in self.path[1:-1]:
+            pygame.draw.rect(self.app.screen, 'pink', (step[1] * self.app.cell_width+BORDER_FIELD-10,
+                                                             step[0] * self.app.cell_height+BORDER_FIELD-10,
+                                                             self.app.cell_width,
+                                                             self.app.cell_height))
     def update(self):
         if self.able_to_move:
             self.pix_pos += self.direction*self.speed
@@ -34,6 +56,13 @@ class Player:
         if self.on_loop():
             self.transfer_by_loop()
 
+    def getCostOfActions(self, actions):
+        x, y = self.starting_pos
+        for action in actions:
+            dx, dy = action.x * self.speed, action.y * self.speed
+            x, y = int(x + dx), int(y + dy)
+        return len(actions)
+
     def draw(self):
         self.pacman = pygame.transform.scale(pygame.image.load('images/pacman.png'), (self.app.cell_width,
                                                                                       self.app.cell_height))
@@ -44,7 +73,7 @@ class Player:
         elif (self.direction == vec(0, -1)):
             self.pacman = pygame.transform.flip(self.pacman, False, False)
 
-        self.app.screen.blit(self.pacman, (int(self.pix_pos.x - 10),int(self.pix_pos.y - 10)))
+        self.app.screen.blit(self.pacman, (int(self.pix_pos.x - 15),int(self.pix_pos.y - 15)))
 
 
 
@@ -104,3 +133,34 @@ class Player:
             if vec(self.field_xy+self.direction) == wall:
                 return False
         return True
+
+
+    def collect_coins(self):
+        hero = (self.field_xy[1], self.field_xy[0])
+        if hero in self.app.coins:
+            self.app.coins.remove(hero)
+        newcoins = []
+        for coin in self.app.coins:
+            newcoins.append((coin[1], coin[0]))
+
+        points = [hero] + newcoins
+        # points.append(self.app.target)
+
+        routes = []
+        start_time = time.time()
+        for j in range(len(points) - 1):
+            temp_routs = []
+
+            for i in range(j + 1, len(points)):
+                point1 = (int(points[j][0]-1), int(points[j][1]-1))
+                point2 = (int(points[i][0]-1), int(points[i][1]-1))
+
+                a = AlgStar(self.maze, point1, point2, search_algorythm.greed_h, 0)
+
+                temp_routs.append(a)
+
+            routes += min(temp_routs, key=len)
+        print("M: %s seconds" % (time.time() - start_time))
+        print(len(routes))
+        print(routes)
+        return routes
