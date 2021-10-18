@@ -39,17 +39,19 @@ class Player:
                                                              self.app.cell_width,
                                                              self.app.cell_height))
     def update(self):
-        if self.able_to_move:
-            self.pix_pos += self.direction*self.speed
+        if self.can_move():
+            if self.stored_direction: self.field_xy += vec(self.stored_direction)
+            self.pix_pos = self.get_xy()
+
         if self.time_to_move():
             if self.stored_direction != None:
-                self.direction = self.stored_direction
+                 self.direction = self.stored_direction
             self.able_to_move = self.can_move()
 
-        self.field_xy[0] = (self.pix_pos[0]-BORDER_FIELD +
-                            self.app.cell_width//2)//self.app.cell_width+1
-        self.field_xy[1] = (self.pix_pos[1]-BORDER_FIELD +
-                            self.app.cell_height//2)//self.app.cell_height+1
+        # self.field_xy[0] = (self.pix_pos[0]-BORDER_FIELD +
+        #                     self.app.cell_width//2)//self.app.cell_width+1
+        # self.field_xy[1] = (self.pix_pos[1]-BORDER_FIELD +
+        #                     self.app.cell_height//2)//self.app.cell_height+1
         if self.on_coin():
             self.eat_coin()
 
@@ -130,7 +132,9 @@ class Player:
 
     def can_move(self):
         for wall in self.app.walls:
-            if vec(self.field_xy+self.direction) == wall:
+            if self.stored_direction is None:
+                self.stored_direction = [0,1]
+            if vec(self.field_xy+self.stored_direction) == wall:
                 return False
         return True
 

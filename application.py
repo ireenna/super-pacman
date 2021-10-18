@@ -5,7 +5,7 @@ import numpy as np
 import pygame
 
 import player
-from enemy import Enemy
+from enemy import Enemy, RandomEnemy, TargetEnemy
 from player import Player
 from settings import *
 import random
@@ -39,7 +39,7 @@ class App:
         self.map = self.randomMaze(ROWS - 1, COLS - 1)
         self.target = {}
         # self.set_all_coins()
-        self.generate_coins(1)
+        self.generate_coins_enemies(1,1)
         self.load_rand_map()
 
         self.player = Player(self, vec(self.player_xy))
@@ -133,7 +133,7 @@ class App:
 
     def set_enemies(self):
         for idx, pos in enumerate(self.enemies_xy):
-            self.enemies.append(Enemy(self, vec(pos), idx))
+            self.enemies.append(TargetEnemy(self, vec(pos), idx))
 
     def draw_field(self):
         for x in range(WIDTH//self.cell_width):
@@ -178,18 +178,23 @@ class App:
                 self.running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
+                    print('left')
                     self.player.move(vec(-1, 0))
                 if event.key == pygame.K_RIGHT:
+                    print('right')
                     self.player.move(vec(1, 0))
                 if event.key == pygame.K_UP:
+                    print('up')
                     self.player.move(vec(0, -1))
                 if event.key == pygame.K_DOWN:
+                    print('down')
                     self.player.move(vec(0, 1))
 
     def play_update(self):
         self.player.update()
         for enemy in self.enemies:
             enemy.update()
+        time.sleep(0.4)
 
         for enemy in self.enemies:
             if enemy.field_xy == self.player.field_xy:
@@ -200,7 +205,7 @@ class App:
         self.draw_text('SCORE: {} / {}'.format(self.player.current_score,len(self.high_coins)),
                        self.screen, [60, 0], 18, white, START_FONT)
 
-        self.player.draw_path()
+        # self.player.draw_path()
         self.player.draw()
         self.draw_walls()
         self.draw_coins()
@@ -298,7 +303,7 @@ class App:
 
         self.target = empty_fields.pop()
 
-    def generate_coins(self, num = 4):
+    def generate_coins_enemies(self, c = 4, e=1):
         empty_fields = []
         y = 0
         for line in self.map:
@@ -309,10 +314,16 @@ class App:
                 if char == 1:
                     empty_fields.append(vec(x, y))
 
-        for _ in range(num):
+        for _ in range(c):
             coin = random.choice(empty_fields)
+            empty_fields.remove(coin)
             self.coins.append((coin[0],coin[1]))
             self.high_coins.append((coin[0],coin[1]))
+
+        for _ in range(e):
+            enemy = random.choice(empty_fields)
+            self.enemies_xy.append((enemy[0],enemy[1]))
+            empty_fields.remove(enemy)
 
         self.target = empty_fields.pop()
         print("COINS ", self.coins)
