@@ -1,5 +1,8 @@
+import csv
 import sys
 import time
+from datetime import datetime
+from threading import Timer
 
 import numpy as np
 import pygame
@@ -30,6 +33,9 @@ class App:
         self.coins = []
         self.high_coins = []
         self.enemies = []
+        self.timeinfo = None
+        self.game_points = 0
+
 
         # position for enemies & players
         self.enemies_xy = []
@@ -45,6 +51,7 @@ class App:
 
         self.player = Player(self, vec(self.player_xy))
         self.set_enemies()
+        self.algorythm = self.player.minimax
 
 
 
@@ -131,6 +138,8 @@ class App:
                 self.running = False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 self.state = 'playing'
+                self.timeinfo = datetime.now()
+
         self.start_draw()
 
     def start_draw(self):
@@ -163,7 +172,11 @@ class App:
             #         self.player.move(vec(0, 1))
 
     def play_update(self):
-        self.player.path = self.player.minimax()
+        temp = self.algorythm()
+        if temp:
+            self.player.path=temp.pos_xy
+            self.game_points +=temp.value
+
         self.player.update()
         for enemy in self.enemies:
             enemy.update()
@@ -204,6 +217,9 @@ class App:
 # GAME WIN
 
     def game_win(self):
+        if self.timeinfo:
+            self.writeGameResults()
+            self.timeinfo = None
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -228,6 +244,9 @@ class App:
 # GAME OVER
 
     def game_over(self):
+        if self.timeinfo:
+            self.writeGameResults()
+            self.timeinfo = None
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -249,6 +268,14 @@ class App:
         self.draw_text('PRESS ESC TO QUIT', self.screen, [
             WIDTH // 2, HEIGHT // 2 + 200], START_TEXT_SIZE, white, START_FONT, centered=True)
         pygame.display.update()
+
+    def writeGameResults(self):
+        self.timeinfo = datetime.now() - self.timeinfo
+        data = [self.algorythm.__name__, self.state, str(self.timeinfo), self.player.current_score, self.game_points]
+        print(data)
+        with open('result.csv', 'a', encoding='UTF8') as file:
+            writer = csv.writer(file)
+            writer.writerow(data)
 
 
     def randomMaze(self, width,height):

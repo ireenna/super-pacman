@@ -205,8 +205,6 @@ class Player:
                 new_dirs.append(d)
         return new_dirs
 
-
-   
     def minimax(self):
         pacman_possible_pos = [(i + self.field_xy) for i in self.pos_dirs()]
 
@@ -235,8 +233,7 @@ class Player:
                 if dist_to_ghost <= 1:
                     secondNode_min.children.append(Node(secondNode_min, ghostMoves, True, MIN)) #добавляем как child child-a
                 else:
-                    secondNode_min.children.append(Node(secondNode_min, ghostMoves, True, (dist_to_ghost - dist_to_food*2)))
-
+                    secondNode_min.children.append(Node(secondNode_min, ghostMoves, True, (dist_to_ghost - dist_to_food)+10))
 
         # минимайзер
         for secondNode_min in mainNode_max.children:
@@ -254,6 +251,51 @@ class Player:
                 finishNode = secondNode_min.value
                 finishCords = secondNode_min
 
-        if finishCords:
-            return finishCords.pos_xy
-        return self.field_xy
+        return finishCords
+
+    def expectimax(self):
+        pacman_possible_pos = [(i + self.field_xy) for i in self.pos_dirs()]
+
+        enemies_pos = [en.field_xy for en in self.app.enemies]
+        enemies_possible_pos = [(i + item) for i in enemies_pos for item in self.pos_dirs_for_field(i)]
+
+        # min path to coin
+        old_val = MAX
+        nearest_food = None
+        for item in self.app.coins:
+            new_val = manhattan_h(self.field_xy, item)
+            # or bfs
+            if new_val <= old_val:
+                old_val = new_val
+                nearest_food = item
+
+        mainNode_max = Node(None, None, True, None)
+        for item in pacman_possible_pos:
+            mainNode_max.children.append(Node(mainNode_max, item, False, None))
+
+        for secondNode_min in mainNode_max.children:
+            for ghostMoves in enemies_possible_pos:
+                dist_to_ghost = euclid_h(secondNode_min.pos_xy, ghostMoves)
+                dist_to_food = euclid_h(secondNode_min.pos_xy, nearest_food)
+                # если враг близко и мы к нему приблизимся, то добавляем этот вариант как самый неоптимальный
+                if dist_to_ghost <= 1:
+                    secondNode_min.children.append(
+                        Node(secondNode_min, ghostMoves, True, MIN))  # добавляем как child child-a
+                else:
+                    secondNode_min.children.append(
+                        Node(secondNode_min, ghostMoves, True, (dist_to_ghost - dist_to_food)+10))
+
+        # среднее значение
+        for playerMoves in mainNode_max.children:
+            child_value_list = [secondNode_min.value for secondNode_min in playerMoves.children]
+            playerMoves.value = np.mean(child_value_list)
+
+        # максимизатор
+        finishNode = -sys.maxsize
+        finishCords = None
+        for playerMoves in mainNode_max.children:
+            if playerMoves.value > finishNode:
+                finishNode = playerMoves.value
+                finishCords = playerMoves
+
+        return finishCords
