@@ -1,13 +1,15 @@
 import heapq
+import math
 import queue
 import random
+import sys
 import time
 from datetime import datetime
 
 import pygame
 
 import search_algorythm
-from search_algorythm import AlgStar, euclid_h
+from search_algorythm import *
 from settings import *
 
 
@@ -17,6 +19,7 @@ class Player:
     def __init__(self, app, pos):
         self.app = app
         self.starting_pos = [pos.x, pos.y]
+        print("START ", self.starting_pos)
         self.field_xy = pos
         self.pix_pos = self.get_xy()
         self.direction = vec(0, 0)
@@ -26,7 +29,8 @@ class Player:
         self.speed = 2
         # self.path = []
         self.maze = search_algorythm.maze_to_grid(self.app.map)
-        self.path = self.collect_coins()
+        self.path = []
+        # self.path = self.collect_coins()
 
         # self.path = AlgStar(self.maze, (int(self.field_xy[1])-1, int(self.field_xy[0])-1),
         #                     (int(self.app.target[0]-1),int(self.app.target[1]-1)),
@@ -39,9 +43,13 @@ class Player:
                                                              self.app.cell_width,
                                                              self.app.cell_height))
     def update(self):
-        if self.can_move():
-            if self.stored_direction: self.field_xy += vec(self.stored_direction)
+        if self.path:
+            self.field_xy = vec(self.path[0], self.path[1])
             self.pix_pos = self.get_xy()
+        else:
+            if self.can_move():
+                if self.stored_direction: self.field_xy += vec(self.stored_direction)
+                self.pix_pos = self.get_xy()
 
         if self.time_to_move():
             if self.stored_direction != None:
@@ -81,13 +89,14 @@ class Player:
 
 
     def on_coin(self):
-        if self.field_xy in self.app.coins:
-            if int(self.pix_pos.x+BORDER_FIELD//2) % self.app.cell_width == 0:
-                if self.direction == vec(1, 0) or self.direction == vec(-1, 0):
-                    return True
-            if int(self.pix_pos.y+BORDER_FIELD//2) % self.app.cell_height == 0:
-                if self.direction == vec(0, 1) or self.direction == vec(0, -1):
-                    return True
+        if (self.field_xy[0], self.field_xy[1]) in self.app.coins:
+            return True
+            # if int(self.pix_pos.x+BORDER_FIELD//2) % self.app.cell_width == 0:
+            #     if self.direction == vec(1, 0) or self.direction == vec(-1, 0):
+            #         return True
+            # if int(self.pix_pos.y+BORDER_FIELD//2) % self.app.cell_height == 0:
+            #     if self.direction == vec(0, 1) or self.direction == vec(0, -1):
+            #         return True
         return False
 
     def on_loop(self):
@@ -115,6 +124,8 @@ class Player:
         self.update()
 
     def move(self, direction):
+        # if self.path:
+        #     self.field_xy = self.path[0]
         self.stored_direction = direction
 
     def get_xy(self):
@@ -133,7 +144,7 @@ class Player:
     def can_move(self):
         for wall in self.app.walls:
             if self.stored_direction is None:
-                self.stored_direction = [0,1]
+                self.stored_direction = [0,0]
             if vec(self.field_xy+self.stored_direction) == wall:
                 return False
         return True
@@ -165,6 +176,84 @@ class Player:
 
             routes += min(temp_routs, key=len)
         print("M: %s seconds" % (time.time() - start_time))
-        print(len(routes))
-        print(routes)
         return routes
+
+    def can_move_to_field(self, direction):
+        for wall in self.app.walls:
+            if (self.field_xy + direction) == wall:
+                return False
+        return True
+
+    def can_move_to_field_from_field(self, direction, field):
+        if vec(field[0]+direction[0],field[1]+direction[1]) in self.app.walls:
+            return False
+        return True
+
+    def pos_dirs(self):
+        directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+        new_dirs = []
+        for d in directions:
+            if self.can_move_to_field(d):
+                new_dirs.append(d)
+        return new_dirs
+
+    def pos_dirs_for_field(self, field):
+        directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+        new_dirs = []
+        for d in directions:
+            if self.can_move_to_field_from_field(d, field):
+                new_dirs.append(d)
+        return new_dirs
+
+
+   
+    def minimax(self):
+        pacman_possible_pos = [(i + self.field_xy) for i in self.pos_dirs()]
+
+        enemies_pos = [en.field_xy for en in self.app.enemies]
+        enemies_possible_pos = [(i+item) for i in enemies_pos for item in self.pos_dirs_for_field(i)]
+
+        # min path to coin
+        old_val = MAX
+        nearest_food = None
+        for item in self.app.coins:
+            new_val = manhattan_h(self.field_xy, item)
+            # or bfs
+            if new_val <= old_val:
+                old_val = new_val
+                nearest_food = item
+
+        mainNode_max = Node(None, None, True, None)
+        for item in pacman_possible_pos:
+            mainNode_max.children.append(Node(mainNode_max, item, False, None))
+
+        for secondNode_min in mainNode_max.children:
+            for ghostMoves in enemies_possible_pos:
+                dist_to_ghost = euclid_h(secondNode_min.pos_xy, ghostMoves)
+                dist_to_food = euclid_h(secondNode_min.pos_xy, nearest_food)
+                # если враг близко и мы к нему приблизимся, то добавляем этот вариант как самый неоптимальный
+                if dist_to_ghost <= 1:
+                    secondNode_min.children.append(Node(secondNode_min, ghostMoves, True, MIN)) #добавляем как child child-a
+                else:
+                    secondNode_min.children.append(Node(secondNode_min, ghostMoves, True, (dist_to_ghost - dist_to_food*2)))
+
+
+        # минимайзер
+        for secondNode_min in mainNode_max.children:
+            oldValue = MAX
+            for lowlvlMAX in secondNode_min.children:
+                if lowlvlMAX.value < oldValue:
+                    oldValue = lowlvlMAX.value
+                    secondNode_min.value = oldValue
+
+        # максимайзер
+        finishNode = MIN
+        finishCords = None
+        for secondNode_min in mainNode_max.children:
+            if secondNode_min.value > finishNode:
+                finishNode = secondNode_min.value
+                finishCords = secondNode_min
+
+        if finishCords:
+            return finishCords.pos_xy
+        return self.field_xy

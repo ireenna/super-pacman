@@ -74,22 +74,25 @@ def AlgStar(maze, start, end, func, coins):
             openList.append(child)
 
 
-def manhattan_h(a, b,c):
+def manhattan_h(a, b,c = 0):
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
-def euclid_h(a, b,c):
+def euclid_h(a, b,c = 0):
     return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
 
-def greed_h(a,b,c):
+def greed_h(a,b,c = 0):
     return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 class Node:
-    def __init__(self, parent=None, position=None):
+    def __init__(self, parent=None, position=None, ismax=False, val=None):
         self.heuristic = 0
         self.parent = parent
         self.pos_xy = position
         self.cost = 0
         self.cost_all = 0
+        self.children = []
+        self.isMax = ismax
+        self.value = val
 
     def __eq__(self, other):
         return self.pos_xy == other.pos_xy

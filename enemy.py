@@ -1,3 +1,4 @@
+import csv
 import queue
 import random
 import time
@@ -13,7 +14,7 @@ class Enemy:
         self.app = app
         self.field_xy = pos
         self.starting_pos = [pos.x, pos.y]
-        print("START ", self.starting_pos)
+
         self.pix_pos = self.get_xy()
         self.radius = int(self.app.cell_width // 2.3)
         self.number = number
@@ -32,10 +33,9 @@ class Enemy:
         if self.path is not None:
             pass
 
-        self.field_xy[0] = (self.pix_pos[0] - BORDER_FIELD +
-                            self.app.cell_width // 2) // self.app.cell_width + 1
-        self.field_xy[1] = (self.pix_pos[1] - BORDER_FIELD +
-                            self.app.cell_height // 2) // self.app.cell_height + 1
+        self.field_xy=[(self.pix_pos[0] - BORDER_FIELD +
+                            self.app.cell_width // 2) // self.app.cell_width + 1],[(self.pix_pos[1] - BORDER_FIELD +
+                            self.app.cell_height // 2) // self.app.cell_height + 1]
 
     def draw(self):
         self.pacman = pygame.transform.scale(pygame.image.load('images/ghost.png'), (self.app.cell_width,
@@ -50,11 +50,30 @@ class Enemy:
                    (self.field_xy.y * self.app.cell_height) + BORDER_FIELD // 2 +
                    self.app.cell_height // 2)
 
+    def loadGrid(self):
+        grid = np.zeros((ROWS+3, COLS + 2), dtype=int)
+        file = open("map.txt", "r")  # open the file for reading (thus the "r")
+        content = file.read()  # read the entire file contents into a variable
+        file.close()  # close the file
+        y = 0
+        content= content.split('\n')
+        for line in self.app.map:
+            x = 0
+            y = y + 1
+            for char in line:
+                x = x + 1
+                if char == 0:
+                    grid[y, x] = 1
+                else:
+                    grid[y, x] = 0
+
+        return grid
+
+
     def get_BFS(self, start, target):  # пошаровий пошук (в ширину)
-        grid = self.load_grid()
+        grid = self.loadGrid()
 
         if not self.is_valid_target(target):
-            print("Wrong target")
             return [start]
 
         queue = [start]  # реалізовуємо через чергу
@@ -86,9 +105,8 @@ class Enemy:
         return shortest
 
     def get_DFS(self, start, target):
-        grid = self.load_grid()
+        grid = self.loadGrid()
         if not self.is_valid_target(target):
-            print("Wrong target")
             return [start]
 
         stack = [start]
@@ -118,9 +136,8 @@ class Enemy:
                 return path
 
     def get_UCS(self, start, target):
-        grid = self.load_grid()
+        grid = self.loadGrid()
         if not self.is_valid_target(target):
-            print("Wrong target")
             return [start]
         graph = self.grid_to_graph(grid)
         visited = set()
@@ -166,23 +183,26 @@ class Enemy:
                                                        self.app.cell_height))
 
     def load_grid(self):
-        grid = np.zeros((ROWS + 1, COLS), dtype=int)
-
+        grid = np.zeros((ROWS, COLS), dtype=int)
         y = 0
         for line in self.app.map:
-            y = y + 1
             x = 0
+            y = y + 1
             for char in line:
                 x = x + 1
                 if char == 0:
                     grid[y, x] = 1
                 else:
                     grid[y, x] = 0
+
+
         return grid
 
     def is_valid_target(self, target):
-        grid = self.load_grid()
+        grid = self.loadGrid()
+
         if grid[int(target[1]), int(target[0])] == 1:
+            print("Wrong target: ", target)
             return False
         else:
             return True
@@ -214,7 +234,7 @@ class RandomEnemy(Enemy):
             if(condit1 or condit2):
                 can_move = False
             else:
-                self.field_xy += vec(self.direction)
+                self.field_xy += self.direction
                 self.pix_pos = self.get_xy()
 
         if not can_move:
@@ -222,10 +242,9 @@ class RandomEnemy(Enemy):
             for d in directions:
                 if self.can_move_to_field(d):
                     new_dirs.append(d)
-            print(new_dirs)
 
             self.direction = random.choice(new_dirs)
-            self.field_xy += vec(self.direction)
+            self.field_xy += self.direction
             self.pix_pos = self.get_xy()
 
 
@@ -246,6 +265,7 @@ class TargetEnemy(Enemy):
     # path by algorithm from prev laba
     def update(self):
         self.path = self.get_BFS(self.field_xy, self.app.player.field_xy)
+        self.path.remove(self.field_xy)
         if len(self.path) != 0:
-            self.field_xy = self.path[1]
+            self.field_xy = self.path[0]
             self.pix_pos = self.get_xy()
