@@ -231,17 +231,26 @@ class Player:
                 dist_to_food = euclid_h(secondNode_min.pos_xy, nearest_food)
                 # если враг близко и мы к нему приблизимся, то добавляем этот вариант как самый неоптимальный
                 if dist_to_ghost <= 1:
-                    secondNode_min.children.append(Node(secondNode_min, ghostMoves, True, MIN)) #добавляем как child child-a
+                    secondNode_min.children.append(
+                        Node(secondNode_min, ghostMoves, True, -100))  # добавляем как child child-a
+                if dist_to_food == 0:
+                    secondNode_min.children.append(
+                        Node(secondNode_min, ghostMoves, True, 70 - dist_to_ghost))
                 else:
-                    secondNode_min.children.append(Node(secondNode_min, ghostMoves, True, (dist_to_ghost - dist_to_food)+10))
+                    secondNode_min.children.append(
+                        Node(secondNode_min, ghostMoves, True, ((- dist_to_food + dist_to_ghost) * 0.001 + 30) * 0.2))
 
-        # минимайзер
+        # value = self.minimax2(0, True, mainNode_max, MIN, MAX)
+        # print(value)
+
+        # # минимайзер
         for secondNode_min in mainNode_max.children:
             oldValue = MAX
             for lowlvlMAX in secondNode_min.children:
                 if lowlvlMAX.value < oldValue:
                     oldValue = lowlvlMAX.value
                     secondNode_min.value = oldValue
+
 
         # максимайзер
         finishNode = MIN
@@ -251,7 +260,44 @@ class Player:
                 finishNode = secondNode_min.value
                 finishCords = secondNode_min
 
-        return finishCords
+        if finishCords:
+            print(finishCords.value)
+            # if value == finishCords.value:
+            return finishCords
+        return None
+
+    def minimax2(self, depth, maximizingPlayer, values, alpha, beta):
+
+        if depth == 2:
+            return values.value
+
+        if maximizingPlayer:
+            best = MIN
+            for i in values.children:
+                val = self.minimax2(depth + 1, False, i, alpha, beta)
+                best = max(best, val)
+                alpha = max(alpha, best)
+
+                # Alpha Beta Pruning
+                if beta <= alpha:
+                    break
+
+            return best
+
+        else:
+            best = MAX
+
+            for i in values.children:
+
+                val = self.minimax2(depth + 1, True, i, alpha, beta)
+                best = min(best, val)
+                beta = min(beta, best)
+
+                # Alpha Beta Pruning
+                if beta <= alpha:
+                    break
+
+            return best
 
     def expectimax(self):
         pacman_possible_pos = [(i + self.field_xy) for i in self.pos_dirs()]
@@ -276,14 +322,17 @@ class Player:
         for secondNode_min in mainNode_max.children:
             for ghostMoves in enemies_possible_pos:
                 dist_to_ghost = euclid_h(secondNode_min.pos_xy, ghostMoves)
-                dist_to_food = euclid_h(secondNode_min.pos_xy, nearest_food)
+                dist_to_food = euclid_h(secondNode_min.pos_xy, nearest_food)*50
                 # если враг близко и мы к нему приблизимся, то добавляем этот вариант как самый неоптимальный
                 if dist_to_ghost <= 1:
                     secondNode_min.children.append(
-                        Node(secondNode_min, ghostMoves, True, MIN))  # добавляем как child child-a
+                        Node(secondNode_min, ghostMoves, True, -100))  # добавляем как child child-a
+                if dist_to_food == 0:
+                    secondNode_min.children.append(
+                        Node(secondNode_min, ghostMoves, True, 70-dist_to_ghost))
                 else:
                     secondNode_min.children.append(
-                        Node(secondNode_min, ghostMoves, True, (dist_to_ghost - dist_to_food)+10))
+                        Node(secondNode_min, ghostMoves, True, ((- dist_to_food + dist_to_ghost)*0.001+30)*0.2))
 
         # среднее значение
         for playerMoves in mainNode_max.children:
@@ -297,5 +346,6 @@ class Player:
             if playerMoves.value > finishNode:
                 finishNode = playerMoves.value
                 finishCords = playerMoves
-
+        if finishCords:
+            print("v ",finishCords.value)
         return finishCords

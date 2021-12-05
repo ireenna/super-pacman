@@ -8,6 +8,7 @@ import numpy as np
 import pygame
 
 import player
+from dqn_pacman import PacmanDQN
 from enemy import Enemy, RandomEnemy, TargetEnemy
 from player import Player
 from settings import *
@@ -35,6 +36,8 @@ class App:
         self.enemies = []
         self.timeinfo = None
         self.game_points = 0
+        self.muteAgents = False
+        self.quiet = False
 
 
         # position for enemies & players
@@ -45,28 +48,38 @@ class App:
         # self.map = self.randomMaze(ROWS - 1, COLS - 1)
         self.map = self.loadConstMap()
         self.target = {}
-        # self.set_all_coins()
-        self.generate_coins_enemies(5,2)
+        self.set_all_coins()
+        # self.generate_coins_enemies(5,1)
         self.load_rand_map()
 
         self.player = Player(self, vec(self.player_xy))
+        self.pacmanDqn = PacmanDQN(self.player)
+        # self.pacmanDqn.modelTrain()
+        self.enemies_xy = [(5,5)]
         self.set_enemies()
-        self.algorythm = self.player.minimax
+        # self.algorythm = self.player.minimax
 
 
 
     def run(self):
         while self.running:
             if self.state == 'start':
-                self.start()
+                # self.start()
+                self.state = 'playing'
             elif self.state == 'playing':
                 self.play()
                 self.play_update()
                 self.play_draw()
             elif self.state == 'lost':
-                self.game_over()
+                self.reset()
+                pygame.display.update()
+                # self.state = 'playing'
+                # self.game_over()
             elif self.state == 'win':
-                self.game_win()
+                self.reset()
+                pygame.display.update()
+                # self.state = 'playing'
+                # self.game_win()
             else:
                 self.running = False
             self.clock.tick(FPS)
@@ -88,7 +101,7 @@ class App:
     def loadConstMap(self):
         self.player_xy = [2,2]
         self.map = [[0 for col in range(ROWS+1)] for row in range(COLS+1)]
-        with open("map.txt", 'r') as file:
+        with open("smallmap.txt", 'r') as file:
             for y, line in enumerate(file):
                 for x, char in enumerate(line):
                     if char == "1":
@@ -116,7 +129,7 @@ class App:
 
     def set_enemies(self):
         for idx, pos in enumerate(self.enemies_xy):
-            self.enemies.append(TargetEnemy(self, vec(pos), idx))
+            self.enemies.append(RandomEnemy(self, vec(pos), idx))
 
     def draw_field(self):
         for x in range(WIDTH//self.cell_width):
@@ -161,22 +174,25 @@ class App:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            # if event.type == pygame.KEYDOWN:
-            #     if event.key == pygame.K_LEFT:
-            #         self.player.move(vec(-1, 0))
-            #     if event.key == pygame.K_RIGHT:
-            #         self.player.move(vec(1, 0))
-            #     if event.key == pygame.K_UP:
-            #         self.player.move(vec(0, -1))
-            #     if event.key == pygame.K_DOWN:
-            #         self.player.move(vec(0, 1))
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    self.player.move(vec(-1, 0))
+                if event.key == pygame.K_RIGHT:
+                    self.player.move(vec(1, 0))
+                if event.key == pygame.K_UP:
+                    self.player.move(vec(0, -1))
+                if event.key == pygame.K_DOWN:
+                    self.player.move(vec(0, 1))
 
     def play_update(self):
-        temp = self.algorythm()
-        if temp:
-            self.player.path=temp.pos_xy
-            self.game_points +=temp.value
+        # temp = self.algorythm()
+        # if temp:
+        #     self.player.path=temp.pos_xy
+        #     total_seconds = (datetime.now() - self.timeinfo).total_seconds()
+        #     self.game_points += (temp.value-total_seconds)
+        #     print(self.game_points)
 
+        # self.runnn()
         self.player.update()
         for enemy in self.enemies:
             enemy.update()
@@ -218,7 +234,7 @@ class App:
 
     def game_win(self):
         if self.timeinfo:
-            self.writeGameResults()
+            # self.writeGameResults()
             self.timeinfo = None
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -245,7 +261,7 @@ class App:
 
     def game_over(self):
         if self.timeinfo:
-            self.writeGameResults()
+            # self.writeGameResults()
             self.timeinfo = None
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -350,3 +366,198 @@ class App:
         # прибираємо оглянутий вже елемент з черги
         queue.pop()
         return maze
+
+
+    OLD_STDOUT = None
+    OLD_STDERR = None
+
+    def mute(self, agentIndex):
+        if not self.muteAgents:
+            return
+        global OLD_STDOUT, OLD_STDERR
+        OLD_STDOUT = sys.stdout
+        OLD_STDERR = sys.stderr
+        sys.stdout = self.agentOutput[agentIndex]
+        sys.stderr = self.agentOutput[agentIndex]
+
+    def unmute(self):
+        if not self.muteAgents:
+            return
+        global OLD_STDOUT, OLD_STDERR
+        sys.stdout = OLD_STDOUT
+        sys.stderr = OLD_STDERR
+
+
+    def runGames(self, numGames, numTraining=0):
+        games = []
+        for i in range(numGames):
+            self.runnn()
+
+        if (numGames - numTraining) > 0:
+            scores = [game.state.getScore() for game in games]
+            wins = [game.state.isWin() for game in games]
+            winRate = wins.count(True) / float(len(wins))
+            print(('Average Score:', sum(scores) / float(len(scores))))
+            print(('Scores:       ', ', '.join([str(score) for score in scores])))
+            print(('Win Rate:      %d/%d (%.2f)' %
+                   (wins.count(True), len(wins), winRate)))
+            print(('Record:       ', ', '.join(
+                [['Loss', 'Win'][int(w)] for w in wins])))
+
+        return games
+
+    def runnn(self):
+
+        # move = self.pacmanDqn.getNextMove()
+        # if move:
+        #     if move == 'West':
+        #         self.player.move(vec(-1, 0))
+        #     if move == 'East':
+        #         self.player.move(vec(1, 0))
+        #     if move == 'North':
+        #         self.player.move(vec(0, -1))
+        #     if move == 'South':
+        #         self.player.move(vec(0, 1))
+        # print(move)
+
+        global observation, start_time
+        # self.display.initialize(self.state.data)
+        self.numMoves = 0
+
+        for i in range(len(self.agents)):
+            agent = self.agents[i]
+            if not agent:
+                self.mute(i)
+                self.unmute()
+                self._agentCrash(i, quiet=True)
+                return
+            if ("initialStateRegister" in dir(agent)):
+                self.mute(i)
+                if self.catchExceptions:
+                    try:
+                        try:
+                            start_time = time.time()
+                            time_taken = time.time() - start_time
+                            self.totalAgentTimes[i] += time_taken
+                        except TimeoutFunctionException:
+                            print("Agent %d ran out of time on startup!" %
+                                  i, file=sys.stderr)
+                            self.unmute()
+                            self.agentTimeout = True
+                            self._agentCrash(i, quiet=True)
+                            return
+                    except:
+                        self._agentCrash(i, quiet=False)
+                        self.unmute()
+                        return
+                else:
+                    agent.initialStateRegister(self.state.deepCopy())
+                self.unmute()
+
+        agentIndex = self.startingIndex
+        numAgents = len(self.agents)
+
+        while not self.gameOver:
+            agent = self.agents[agentIndex]
+            move_time = 0
+            skip_action = False
+
+            if 'observationFunction' in dir(agent):
+                self.mute(agentIndex)
+                if self.catchExceptions:
+                    try:
+                        timed_func = TimeoutFunction(agent.observationFunction, int(
+                            self.rules.getMoveTimeout(agentIndex)))
+                        try:
+                            start_time = time.time()
+                            observation = timed_func(self.state.deepCopy())
+                        except TimeoutFunctionException:
+                            skip_action = True
+                        move_time += time.time() - start_time
+                        self.unmute()
+                    except:
+                        self._agentCrash(agentIndex, quiet=False)
+                        self.unmute()
+                        return
+                else:
+                    observation = agent.observationFunction(
+                        self.state.deepCopy())
+                self.unmute()
+            else:
+                observation = self.state.deepCopy()
+
+            action = None
+            self.mute(agentIndex)
+            if self.catchExceptions:
+                try:
+                    timed_func = TimeoutFunction(agent.getAction, int(
+                        self.rules.getMoveTimeout(agentIndex)) - int(move_time))
+                    try:
+                        start_time = time.time()
+                        if skip_action:
+                            raise TimeoutFunctionException()
+                        action = timed_func(observation)
+                    except TimeoutFunctionException:
+                        self.agentTimeout = True
+                        self._agentCrash(agentIndex, quiet=True)
+                        self.unmute()
+                        return
+
+                    move_time += time.time() - start_time
+
+                    if move_time > self.rules.getMoveWarningTime(agentIndex):
+                        self.totalAgentTimeWarnings[agentIndex] += 1
+                        if self.totalAgentTimeWarnings[agentIndex] > self.rules.getMaxTimeWarnings(agentIndex):
+                            self.agentTimeout = True
+                            self._agentCrash(agentIndex, quiet=True)
+                            self.unmute()
+                            return
+
+                    self.totalAgentTimes[agentIndex] += move_time
+                    if self.totalAgentTimes[agentIndex] > self.rules.getMaxTotalTime(agentIndex):
+                        self.agentTimeout = True
+                        self._agentCrash(agentIndex, quiet=True)
+                        self.unmute()
+                        return
+                    self.unmute()
+                except:
+                    self._agentCrash(agentIndex)
+                    self.unmute()
+                    return
+            else:
+                action = agent.getAction(observation)
+            self.unmute()
+
+            self.moveHistory.append((agentIndex, action))
+            if self.catchExceptions:
+                try:
+                    self.state = self.state.generateSuccessor(
+                        agentIndex, action)
+                except:
+                    self.mute(agentIndex)
+                    self._agentCrash(agentIndex)
+                    self.unmute()
+                    return
+            else:
+                self.state = self.state.generateSuccessor(agentIndex, action)
+
+            self.display.update(self.state.data)
+
+            self.rules.process(self.state, self)
+            if agentIndex == numAgents + 1:
+                self.numMoves += 1
+            agentIndex = (agentIndex + 1) % numAgents
+
+        for agentIndex, agent in enumerate(self.agents):
+            if "end" in dir(agent):
+                try:
+                    self.mute(agentIndex)
+                    agent.end(self.state)
+                    self.unmute()
+                except:
+                    if not self.catchExceptions:
+                        raise
+                    self._agentCrash(agentIndex)
+                    self.unmute()
+                    return
+        self.display.finish()

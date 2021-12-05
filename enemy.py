@@ -52,7 +52,7 @@ class Enemy:
 
     def loadGrid(self):
         grid = np.zeros((ROWS+3, COLS + 2), dtype=int)
-        file = open("map.txt", "r")  # open the file for reading (thus the "r")
+        file = open("smallmap.txt", "r")  # open the file for reading (thus the "r")
         content = file.read()  # read the entire file contents into a variable
         file.close()  # close the file
         y = 0
