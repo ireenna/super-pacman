@@ -1,6 +1,7 @@
 import csv
 import sys
 import time
+import traceback
 from datetime import datetime
 from threading import Timer
 
@@ -38,6 +39,8 @@ class App:
         self.game_points = 0
         self.muteAgents = False
         self.quiet = False
+        self.catchExceptions = False
+        self.moveHistory = []
 
 
         # position for enemies & players
@@ -53,38 +56,62 @@ class App:
         self.load_rand_map()
 
         self.player = Player(self, vec(self.player_xy))
-        self.pacmanDqn = PacmanDQN(self.player)
+        self.pacmanDqn = {}
         # self.pacmanDqn.modelTrain()
         self.enemies_xy = [(5,5)]
         self.set_enemies()
+        import io
+        agents = [self.player]
+        self.agentOutput = [io.StringIO() for agent in agents]
+
         # self.algorythm = self.player.minimax
 
-
+    def loadGrid(self):
+        grid = np.zeros((ROWS+3, COLS + 2), dtype=int)
+        file = open("smallmap.txt", "r")  # open the file for reading (thus the "r")
+        content = file.read()  # read the entire file contents into a variable
+        file.close()  # close the file
+        y = 0
+        content= content.split('\n')
+        for line in self.map:
+            x = 0
+            y = y + 1
+            for char in line:
+                x = x + 1
+                if char == 0:
+                    grid[y, x] = 1
+                else:
+                    grid[y, x] = 0
+        # print(grid)
+        return grid
 
     def run(self):
-        while self.running:
-            if self.state == 'start':
+        # while self.running:
+        if self.state == 'start':
                 # self.start()
-                self.state = 'playing'
-            elif self.state == 'playing':
-                self.play()
-                self.play_update()
-                self.play_draw()
-            elif self.state == 'lost':
-                self.reset()
-                pygame.display.update()
+            self.state = 'playing'
+        elif self.state == 'playing':
+            self.play()
+            self.play_update()
+            self.play_draw()
+        elif self.state == 'lost':
+            self.running = False
+                # self.reset()
+                # pygame.display.update()
                 # self.state = 'playing'
                 # self.game_over()
-            elif self.state == 'win':
-                self.reset()
-                pygame.display.update()
+        elif self.state == 'win':
+            self.running = False
+
+                # self.reset()
+                # pygame.display.update()
                 # self.state = 'playing'
                 # self.game_win()
-            else:
-                self.running = False
-            self.clock.tick(FPS)
-        pygame.quit()
-        sys.exit()
+        else:
+            self.running = False
+        # self.clock.tick(FPS)
+        # pygame.quit()
+        # sys.exit()
 
 
 
@@ -129,7 +156,7 @@ class App:
 
     def set_enemies(self):
         for idx, pos in enumerate(self.enemies_xy):
-            self.enemies.append(RandomEnemy(self, vec(pos), idx))
+            self.enemies.append(TargetEnemy(self, vec(pos), idx))
 
     def draw_field(self):
         for x in range(WIDTH//self.cell_width):
@@ -171,18 +198,19 @@ class App:
 # PLAYING
 
     def play(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
-                    self.player.move(vec(-1, 0))
-                if event.key == pygame.K_RIGHT:
-                    self.player.move(vec(1, 0))
-                if event.key == pygame.K_UP:
-                    self.player.move(vec(0, -1))
-                if event.key == pygame.K_DOWN:
-                    self.player.move(vec(0, 1))
+        # for event in pygame.event.get():
+        #     if event.type == pygame.QUIT:
+        #         self.running = False
+        #     if event.type == pygame.KEYDOWN:
+        #         if event.key == pygame.K_LEFT:
+        #             self.player.move(vec(-1, 0))
+        #         if event.key == pygame.K_RIGHT:
+        #             self.player.move(vec(1, 0))
+        #         if event.key == pygame.K_UP:
+        #             self.player.move(vec(0, -1))
+        #         if event.key == pygame.K_DOWN:
+        #             self.player.move(vec(0, 1))
+        self.player.move(vec(self.player.direction))
 
     def play_update(self):
         # temp = self.algorythm()
@@ -219,7 +247,9 @@ class App:
             # enemy.path = enemy.get_DFS(vec(enemy.field_xy), self.player.field_xy)
             # enemy.path = enemy.get_UCS(vec(enemy.field_xy), vec(self.player.field_xy))
             enemy.draw_path()
+
         pygame.display.update()
+
 
 
     def draw_coins(self):
@@ -288,7 +318,7 @@ class App:
     def writeGameResults(self):
         self.timeinfo = datetime.now() - self.timeinfo
         data = [self.algorythm.__name__, self.state, str(self.timeinfo), self.player.current_score, self.game_points]
-        print(data)
+        # print(data)
         with open('result.csv', 'a', encoding='UTF8') as file:
             writer = csv.writer(file)
             writer.writerow(data)
@@ -304,21 +334,15 @@ class App:
 
 
     def set_all_coins(self):
-        empty_fields = []
-        y = 0
-        for line in self.map:
-            y = y + 1
-            x = 0
-            for char in line:
-                x = x + 1
-                if char == 1:
-                    empty_fields.append(vec(x, y))
+        # empty_fields = []
+        self.coins.append((6,6))
+        self.coins.append((6,2))
+        self.coins.append((2,6))
+        self.high_coins.append((6, 6))
+        self.high_coins.append((6, 2))
+        self.high_coins.append((2, 6))
 
-        for coin in empty_fields:
-            self.coins.append((coin[0],coin[1]))
-            self.high_coins.append((coin[0],coin[1]))
-
-        self.target = empty_fields.pop()
+        # self.target = empty_fields.pop()
 
     def generate_coins_enemies(self, c = 4, e=1):
         empty_fields = []
@@ -387,11 +411,46 @@ class App:
         sys.stdout = OLD_STDOUT
         sys.stderr = OLD_STDERR
 
+    def replay(self):
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.clock = pygame.time.Clock()
+        self.running = True
+        self.state = 'start'
+        self.cell_width = MAP_WIDTH // COLS
+        self.cell_height = MAP_HEIGHT // ROWS
+        self.walls = []
+        self.loops = []
+        self.coins = []
+        self.high_coins = []
+        self.enemies = []
+        self.timeinfo = None
+        self.game_points = 0
+        self.muteAgents = False
+        self.quiet = False
+        self.catchExceptions = False
+        self.moveHistory = []
+        self.enemies_xy = []
+        self.player_xy = None
+        self.background = pygame.transform.scale(pygame.image.load('images/Background.png'), (MAP_WIDTH, MAP_HEIGHT))
+        self.map = []
+        self.map = self.loadConstMap()
+        self.target = {}
+        self.set_all_coins()
+        self.load_rand_map()
+
+        self.player = Player(self, vec(self.player_xy))
+        self.enemies_xy = [(6, 6)]
+        self.set_enemies()
+
 
     def runGames(self, numGames, numTraining=0):
         games = []
+        self.pacmanDqn = PacmanDQN()
         for i in range(numGames):
+            self.state = 'playing'
             self.runnn()
+            self.replay()
+            # self.run()
 
         if (numGames - numTraining) > 0:
             scores = [game.state.getScore() for game in games]
@@ -406,26 +465,29 @@ class App:
 
         return games
 
+    def _agentCrash(self, agentIndex, quiet=False):
+        "Helper method for handling agent crashes"
+        if not quiet:
+            traceback.print_exc()
+        self.state = 'lost'
+        self.agentCrashed = True
+
+
+
+    def deepCopy(self):
+        return self.copy()
+
     def runnn(self):
-
-        # move = self.pacmanDqn.getNextMove()
-        # if move:
-        #     if move == 'West':
-        #         self.player.move(vec(-1, 0))
-        #     if move == 'East':
-        #         self.player.move(vec(1, 0))
-        #     if move == 'North':
-        #         self.player.move(vec(0, -1))
-        #     if move == 'South':
-        #         self.player.move(vec(0, 1))
-        # print(move)
-
         global observation, start_time
-        # self.display.initialize(self.state.data)
-        self.numMoves = 0
 
-        for i in range(len(self.agents)):
-            agent = self.agents[i]
+        self.numMoves = 0
+        agents = []
+        pacm = self.pacmanDqn
+        agents.append(pacm)
+
+
+        for i in range(len(agents)):
+            agent = agents[i]
             if not agent:
                 self.mute(i)
                 self.unmute()
@@ -433,126 +495,63 @@ class App:
                 return
             if ("initialStateRegister" in dir(agent)):
                 self.mute(i)
-                if self.catchExceptions:
-                    try:
-                        try:
-                            start_time = time.time()
-                            time_taken = time.time() - start_time
-                            self.totalAgentTimes[i] += time_taken
-                        except TimeoutFunctionException:
-                            print("Agent %d ran out of time on startup!" %
-                                  i, file=sys.stderr)
-                            self.unmute()
-                            self.agentTimeout = True
-                            self._agentCrash(i, quiet=True)
-                            return
-                    except:
-                        self._agentCrash(i, quiet=False)
-                        self.unmute()
-                        return
-                else:
-                    agent.initialStateRegister(self.state.deepCopy())
+
+                agent.initialStateRegister(self)
                 self.unmute()
 
-        agentIndex = self.startingIndex
-        numAgents = len(self.agents)
+        agentIndex = 0
+        numAgents = len(agents)
 
-        while not self.gameOver:
-            agent = self.agents[agentIndex]
-            move_time = 0
-            skip_action = False
+        while not (self.state == 'lost' or self.state == 'won'):
+
+            self.clock.tick(FPS)
+            agent = agents[agentIndex]
+
 
             if 'observationFunction' in dir(agent):
                 self.mute(agentIndex)
-                if self.catchExceptions:
-                    try:
-                        timed_func = TimeoutFunction(agent.observationFunction, int(
-                            self.rules.getMoveTimeout(agentIndex)))
-                        try:
-                            start_time = time.time()
-                            observation = timed_func(self.state.deepCopy())
-                        except TimeoutFunctionException:
-                            skip_action = True
-                        move_time += time.time() - start_time
-                        self.unmute()
-                    except:
-                        self._agentCrash(agentIndex, quiet=False)
-                        self.unmute()
-                        return
-                else:
-                    observation = agent.observationFunction(
-                        self.state.deepCopy())
+
+                observation = agent.observationFunction(
+                    self)
                 self.unmute()
             else:
-                observation = self.state.deepCopy()
+                observation = self
 
             action = None
             self.mute(agentIndex)
-            if self.catchExceptions:
-                try:
-                    timed_func = TimeoutFunction(agent.getAction, int(
-                        self.rules.getMoveTimeout(agentIndex)) - int(move_time))
-                    try:
-                        start_time = time.time()
-                        if skip_action:
-                            raise TimeoutFunctionException()
-                        action = timed_func(observation)
-                    except TimeoutFunctionException:
-                        self.agentTimeout = True
-                        self._agentCrash(agentIndex, quiet=True)
-                        self.unmute()
-                        return
 
-                    move_time += time.time() - start_time
+            action = agent.getAction(observation)
 
-                    if move_time > self.rules.getMoveWarningTime(agentIndex):
-                        self.totalAgentTimeWarnings[agentIndex] += 1
-                        if self.totalAgentTimeWarnings[agentIndex] > self.rules.getMaxTimeWarnings(agentIndex):
-                            self.agentTimeout = True
-                            self._agentCrash(agentIndex, quiet=True)
-                            self.unmute()
-                            return
+            self.player.direction = action
+            if action == 'Stop':
+                self.player.direction = (0,0)
 
-                    self.totalAgentTimes[agentIndex] += move_time
-                    if self.totalAgentTimes[agentIndex] > self.rules.getMaxTotalTime(agentIndex):
-                        self.agentTimeout = True
-                        self._agentCrash(agentIndex, quiet=True)
-                        self.unmute()
-                        return
-                    self.unmute()
-                except:
-                    self._agentCrash(agentIndex)
-                    self.unmute()
-                    return
-            else:
-                action = agent.getAction(observation)
+            self.run()
+
+
             self.unmute()
 
             self.moveHistory.append((agentIndex, action))
-            if self.catchExceptions:
-                try:
-                    self.state = self.state.generateSuccessor(
-                        agentIndex, action)
-                except:
-                    self.mute(agentIndex)
-                    self._agentCrash(agentIndex)
-                    self.unmute()
-                    return
-            else:
-                self.state = self.state.generateSuccessor(agentIndex, action)
 
-            self.display.update(self.state.data)
+            for enemy in self.enemies:
+                if enemy.field_xy == self.player.field_xy:
+                    self.player.current_score = -100
+                    self.state = "lost"
+            if len(self.coins) == 0:
+                self.player.current_score = 100
+                self.state = "won"
 
-            self.rules.process(self.state, self)
+
+            self.process(self.state, self)
             if agentIndex == numAgents + 1:
                 self.numMoves += 1
             agentIndex = (agentIndex + 1) % numAgents
 
-        for agentIndex, agent in enumerate(self.agents):
+        for agentIndex, agent in enumerate(agents):
             if "end" in dir(agent):
                 try:
                     self.mute(agentIndex)
-                    agent.end(self.state)
+                    agent.end(self)
                     self.unmute()
                 except:
                     if not self.catchExceptions:
@@ -560,4 +559,17 @@ class App:
                     self._agentCrash(agentIndex)
                     self.unmute()
                     return
-        self.display.finish()
+
+
+
+    def process(self, state, game):
+        if state == 'won':
+            self.win(state, game)
+        if state == 'lose':
+            self.lose(state, game)
+
+    def win(self, state, game):
+        print(("Pacman emerges victorious! Score: %d" % self.player.current_score))
+
+    def lose(self, state, game):
+        print(("Pacman died! Score: %d" % self.player.current_score))

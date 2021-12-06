@@ -8,6 +8,7 @@ import numpy as np
 
 import player
 from dqn import dqn
+from settings import WIDTH, HEIGHT, ROWS, COLS
 
 settings = {
     'epsilon': 1.0,
@@ -43,12 +44,12 @@ def getDirection(value):
         return Directions.WEST
 
 
-class PacmanDQN(player.Player):
-    def __init__(self, args):
+class PacmanDQN():
+    def __init__(self):
         # super().__init__()
         self.params = settings
-        self.params['width'] = 180
-        self.params['height'] = 180
+        self.params['width'] = ROWS+1
+        self.params['height'] = COLS+1
         self.params['num_training'] = 100
         self.dqn_net = dqn(self.params)
         self.general_record_time = time.strftime("%a %d %b %Y %H %M %S", time.localtime())
@@ -92,20 +93,20 @@ class PacmanDQN(player.Player):
         if self.last_action is not None:
             self.last_state = np.copy(self.current_state)
             self.current_state = self.matricesStatesGet(state)
-            self.current_score = state.getScore()
+            self.current_score = state.player.current_score
             reward = self.current_score - self.last_score
             self.last_score = self.current_score
 
             # Система нагороди
-            if reward > 20:
+            if reward > 1:
                 self.last_reward = 50
-            elif reward > 0:
+            elif reward == 0:
                 self.last_reward = 10
             elif reward < -10:
                 self.last_reward = -500
                 self.won = False
-            elif reward < 0:
-                self.last_reward = -1
+            elif reward <= 0:
+                self.last_reward = 0
 
             if self.terminal and self.won:
                 self.last_reward = 100.
@@ -136,16 +137,16 @@ class PacmanDQN(player.Player):
 
     def log(self):
         log_file = open('./logs/' + str(self.general_record_time) +
-                        '-iteration_num-' + str(self.params['num_training']) + '.log', 'a')
-        log_file.write("# %4d ; steps: %5d ; time_elapsed: %4f ; points: %12f ; epsilon: %10f " %
+                        '-' + str(self.params['num_training']) + '.log', 'a')
+        log_file.write("# %4d ; steps: %5d ; time_elapsed: %4f ; points: %12f ; epsilon: %10f; Q: %10f ; won: %r \n" %
                        (self.iteration_number,
                         self.local_cnt,
                         time.time() - self.start_time,
                         self.ep_rew,
-                        self.params['epsilon']))
-        log_file.write("; Q: %10f ; won: %r \n" % (max(self.Q_global,
-                                                       default=float('nan')),
-                                                   self.won))
+                        self.params['epsilon'],
+                        max(self.Q_global, default=float('nan')),
+                        self.won))
+
         sys.stdout.write("# %4d ; steps: %5d ; time_elapsed: %4f ; points: %12f ; epsilon: %10f " %
                          (self.iteration_number,
                           self.local_cnt,
@@ -203,81 +204,68 @@ class PacmanDQN(player.Player):
     def matricesStatesGet(self, state):
 
         def matrixFoodGet(game_state):
-            width, height = game_state.data.layout.width, game_state.data.layout.height
-            grid = game_state.data.food
+            width, height = ROWS+1,COLS+1
+            grid = game_state.coins
             matrix = np.zeros((height, width), dtype=np.int8)
-            for i in range(grid.height):
-                for j in range(grid.width):
-                    cell = 1 if grid[j][i] else 0
-                    matrix[-1 - i][j] = cell
+            for i in grid:
+                matrix[-1 - int(i[1])+1, int(i[0])-1] = 1
             return matrix
 
-        def matrixCapsulesGet(game_state):
-            width, height = game_state.data.layout.width, game_state.data.layout.height
-            capsules = game_state.data.layout.capsules
-            matrix = np.zeros((height, width), dtype=np.int8)
-            for i in capsules:
-                matrix[-1 - i[1], i[0]] = 1
-            return matrix
 
         def matrixPacmanGet(game_state):
-            width, height = game_state.data.layout.width, game_state.data.layout.height
+            width, height = ROWS+1, COLS+1
             matrix = np.zeros((height, width), dtype=np.int8)
-            for agentState in game_state.data.agentStates:
-                if agentState.isPacman:
-                    pos = agentState.configuration.getPosition()
-                    cell = 1
-                    matrix[-1 - int(pos[1])][int(pos[0])] = cell
+            pos = game_state.player.field_xy
+            cell = 1
+            matrix[-1 - int(pos[1])+1][int(pos[0])-1] = cell
             return matrix
 
         def matrixWallGet(game_state):
-            width, height = game_state.data.layout.width, game_state.data.layout.height
-            grid = game_state.data.layout.walls
+            width, height = ROWS+1, COLS+1
+            grid = game_state.map
             matrix = np.zeros((height, width), dtype=np.int8)
-            for i in range(grid.height):
-                for j in range(grid.width):
-                    cell = 1 if grid[j][i] else 0
+            for i in range(height):
+                for j in range(width):
+                    cell = 0 if grid[j][i] else 1
                     matrix[-1 - i][j] = cell
+
             return matrix
 
         def matrixGhostGet(game_state):
-            width, height = game_state.data.layout.width, game_state.data.layout.height
+            width, height = ROWS+1,COLS+1
             matrix = np.zeros((height, width), dtype=np.int8)
-            for agentState in game_state.data.agentStates:
-                if not agentState.isPacman:
-                    if not agentState.scaredTimer > 0:
-                        pos = agentState.configuration.getPosition()
-                        cell = 1
-                        matrix[-1 - int(pos[1])][int(pos[0])] = cell
+            for agentState in game_state.enemies:
+                pos = agentState.field_xy
+                cell = 1
+                matrix[-1 - int(pos[1])][int(pos[0])] = cell
+
             return matrix
 
-        def matrixScaredGhostGet(game_state):
-            width, height = game_state.data.layout.width, game_state.data.layout.height
-            matrix = np.zeros((height, width), dtype=np.int8)
-            for agentState in game_state.data.agentStates:
-                if not agentState.isPacman:
-                    if agentState.scaredTimer > 0:
-                        pos = agentState.configuration.getPosition()
-                        cell = 1
-                        matrix[-1 - int(pos[1])][int(pos[0])] = cell
-            return matrix
 
-        width, height = self.params['width'], self.params['height']
-        observation = np.zeros((6, height, width))
+        observation = np.zeros((6, 7, 7))
         observation[0] = matrixWallGet(state)
         observation[1] = matrixPacmanGet(state)
         observation[2] = matrixGhostGet(state)
-        observation[3] = matrixScaredGhostGet(state)
-        observation[4] = matrixFoodGet(state)
-        observation[5] = matrixCapsulesGet(state)
+        observation[3] = matrixFoodGet(state)
         observation = np.swapaxes(observation, 0, 2)
         return observation
 
     def getAction(self, state):
         move = self.getNextMove()
-        legal = state.getLegalActions(0)
-        if move not in legal:
+        legal = state.player.pos_dirs()
+        if move:
+            if move == 'West':
+                move = (-1, 0)
+            if move == 'East':
+                move = (1, 0)
+            if move == 'North':
+                move = (0, -1)
+            if move == 'South':
+                move = (0, 1)
+
+        if [move[0],move[1]] not in legal:
             move = Directions.STOP
+
         return move
 
     def initialStateRegister(self, state):

@@ -19,7 +19,7 @@ class Player:
     def __init__(self, app, pos):
         self.app = app
         self.starting_pos = [pos.x, pos.y]
-        print("START ", self.starting_pos)
+        # print("START ", self.starting_pos)
         self.field_xy = pos
         self.pix_pos = self.get_xy()
         self.direction = vec(0, 0)
@@ -261,7 +261,7 @@ class Player:
                 finishCords = secondNode_min
 
         if finishCords:
-            print(finishCords.value)
+            # print(finishCords.value)
             # if value == finishCords.value:
             return finishCords
         return None
